@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "UserPreference": {
+      "title": "User Preference",
+      "description": "Preferences for the user, such as customized name and audio mute states.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "isMuted": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "creatorName", "isMuted", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A single message in the chat history.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "sender": { "type": "string", "enum": ["user", "zoya"] },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "sender", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/preferences/settings": {
+      "schema": "UserPreference",
+      "description": "The user's specific settings."
+    },
+    "/users/{userId}/chat_history/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Subcollection storing the user's historical chat messages with Zoya."
+    }
+  }
+}

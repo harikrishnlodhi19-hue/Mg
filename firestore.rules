@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable, hardened global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Validation Blueprints
+    function isValidUserPreference(data) {
+      return data.keys().hasAll(['userId', 'creatorName', 'isMuted', 'updatedAt'])
+        && data.keys().size() == 4
+        && data.userId == request.auth.uid
+        && data.creatorName is string
+        && data.creatorName.size() >= 1
+        && data.creatorName.size() <= 100
+        && data.isMuted is bool
+        && data.updatedAt == request.time;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['userId', 'sender', 'text', 'createdAt'])
+        && data.keys().size() == 4
+        && data.userId == request.auth.uid
+        && data.sender is string
+        && (data.sender == 'user' || data.sender == 'zoya')
+        && data.text is string
+        && data.text.size() >= 1
+        && data.text.size() <= 10000
+        && data.createdAt == request.time;
+    }
+
+    // Match patterns
+    match /users/{userId} {
+      allow read, write: if false; // split collection protection
+
+      match /preferences/settings {
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidUserPreference(incoming());
+        allow update: if isOwner(userId) 
+          && isValidUserPreference(incoming())
+          && incoming().userId == existing().userId; // Immutable owner UID
+        allow delete: if false; // Settings are immortal 
+      }
+
+      match /chat_history/{messageId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId); // Explicitly secure list queries
+        allow create: if isOwner(userId) 
+          && isValidId(messageId) 
+          && isValidChatMessage(incoming());
+        allow update: if false; // Chat messages are immutable
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
